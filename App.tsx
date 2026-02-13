@@ -11,7 +11,7 @@ import {
   CartesianGrid, XAxis, YAxis,
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell, LabelList, Tooltip as RechartsTooltip
 } from 'recharts';
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { MedicalData, Gender } from './types';
@@ -107,8 +107,14 @@ const App: React.FC = () => {
     setIsAiLoading(true);
     setAiInsight(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-      const prompt = `Você é um cardiologista e nefrologista sênior. Analise o seguinte perfil de risco cardiorrenal integrado e forneça um parecer técnico rico e detalhado em português.
+      const openai = new OpenAI({
+        apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+        dangerouslyAllowBrowser: true // Necessário para uso no lado do cliente
+      });
+
+      const systemPrompt = "Você é um assistente médico especializado em análise de risco cardiovascular e renal crônico. Suas respostas devem ser precisas, baseadas em evidências e formatadas como laudos profissionais.";
+
+      const userPrompt = `Você é um cardiologista e nefrologista sênior. Analise o seguinte perfil de risco cardiorrenal integrado e forneça um parecer técnico rico e detalhado em português.
       
       DADOS DO PACIENTE:
       - Idade: ${formData.age} anos, Sexo: ${formData.gender === Gender.MALE ? 'Masculino' : 'Feminino'}
@@ -126,20 +132,20 @@ const App: React.FC = () => {
       
       REGRAS: Use linguagem técnica. Não use asteriscos para negrito. Mantenha um tom profissional.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: "Você é um assistente médico especializado em análise de risco cardiovascular e renal crônico. Suas respostas devem ser precisas, baseadas em evidências e formatadas como laudos profissionais.",
-          temperature: 0.7,
-        }
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
       });
 
-      const text = response.text || "Não foi possível gerar a análise no momento.";
+      const text = response.choices[0]?.message?.content || "Não foi possível gerar a análise no momento.";
       setAiInsight(text.replace(/\*\*/g, '').replace(/\*/g, '•'));
     } catch (error) {
       console.error("AI Error:", error);
-      setAiInsight("Erro ao processar o parecer técnico. Verifique a conexão com o servidor de IA.");
+      setAiInsight("Erro ao processar o parecer técnico. Verifique a chave da API e a conexão.");
     } finally {
       setIsAiLoading(false);
     }
