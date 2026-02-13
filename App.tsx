@@ -244,7 +244,19 @@ const App: React.FC = () => {
               <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
                 <Key className="text-indigo-600" size={24} />
               </div>
-              <h3 className="text-xl font-black">Configurar OpenAI API</h3>
+              <h3 className="text-xl font-black">Configurar IA Provider</h3>
+            </div>
+
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6">
+              {(['openai', 'groq', 'gemini'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => changeProvider(p)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${provider === p ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
 
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
