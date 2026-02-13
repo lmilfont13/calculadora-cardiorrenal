@@ -5,7 +5,7 @@ import {
   ChevronRight, ArrowLeft, Download,
   Moon, Sun, Brain,
   TrendingDown, Target, ShieldAlert,
-  Stethoscope, Microscope, Info, FileText, AlertTriangle, LayoutDashboard
+  Stethoscope, Microscope, Info, FileText, AlertTriangle, LayoutDashboard, Settings, Key
 } from 'lucide-react';
 import {
   CartesianGrid, XAxis, YAxis,
@@ -53,6 +53,13 @@ const App: React.FC = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [patientId, setPatientId] = useState("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('openai_api_key', key);
+  };
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -107,8 +114,16 @@ const App: React.FC = () => {
     setIsAiLoading(true);
     setAiInsight(null);
     try {
+      const effectiveKey = apiKey || import.meta.env.VITE_OPENAI_API_KEY;
+
+      if (!effectiveKey || effectiveKey === 'PLACEHOLDER_API_KEY') {
+        alert("Por favor, configure sua chave da OpenAI nas configurações (ícone de engrenagem) para gerar o parecer.");
+        setIsAiLoading(false);
+        return;
+      }
+
       const openai = new OpenAI({
-        apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+        apiKey: effectiveKey,
         dangerouslyAllowBrowser: true // Necessário para uso no lado do cliente
       });
 
@@ -188,10 +203,53 @@ const App: React.FC = () => {
             <button onClick={() => setDarkMode(!darkMode)} className="p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               {darkMode ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-slate-500" />}
             </button>
+            <button onClick={() => setShowSettings(!showSettings)} className="p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
+              <Settings size={20} className="text-slate-500" />
+              {!apiKey && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+            </button>
             <button onClick={() => { setView('calc'); setStep(1); }} className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl">Novo Exame</button>
           </div>
         </div>
       </nav>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSettings(false)}>
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 dark:border-slate-800" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
+                <Key className="text-indigo-600" size={24} />
+              </div>
+              <h3 className="text-xl font-black">Configurar OpenAI API</h3>
+            </div>
+
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              Insira sua chave de API da OpenAI para habilitar a geração de laudos inteligentes. A chave será salva apenas no seu navegador.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">API Key (sk-...)</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => saveApiKey(e.target.value)}
+                  placeholder="sk-..."
+                  className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold border-2 border-slate-100 dark:border-slate-700 focus:border-indigo-500 outline-none transition-all text-sm"
+                />
+              </div>
+
+              <button onClick={() => setShowSettings(false)} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all">
+                Salvar e Fechar
+              </button>
+
+              <p className="text-[10px] text-center text-slate-400">
+                Nunca compartilhe sua chave de API com ninguém.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-grow">
         {view === 'home' && (
@@ -370,7 +428,7 @@ const App: React.FC = () => {
                 <div className="relative z-10 flex flex-col md:flex-row gap-10 items-center">
                   <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center shrink-0"><Brain className="text-indigo-300" size={40} /></div>
                   <div className="flex-grow space-y-4">
-                    <h3 className="text-2xl font-black">Parecer Preditivo Gemini 3</h3>
+                    <h3 className="text-2xl font-black">Parecer Preditivo OpenAI (GPT-4o)</h3>
                     {aiInsight ? (
                       <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-medium">{aiInsight}</div>
                     ) : (
