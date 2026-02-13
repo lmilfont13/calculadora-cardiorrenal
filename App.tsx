@@ -54,11 +54,23 @@ const App: React.FC = () => {
   const [patientId, setPatientId] = useState("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+  const [provider, setProvider] = useState<'openai' | 'groq' | 'gemini'>(
+    (localStorage.getItem('ai_provider') as any) || 'openai'
+  );
+  const [apiKeys, setApiKeys] = useState({
+    openai: localStorage.getItem('openai_api_key') || '',
+    groq: localStorage.getItem('groq_api_key') || '',
+    gemini: localStorage.getItem('gemini_api_key') || ''
+  });
 
-  const saveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('openai_api_key', key);
+  const saveApiKey = (key: string, prov: string) => {
+    setApiKeys(prev => ({ ...prev, [prov]: key }));
+    localStorage.setItem(`${prov}_api_key`, key);
+  };
+
+  const changeProvider = (prov: 'openai' | 'groq' | 'gemini') => {
+    setProvider(prov);
+    localStorage.setItem('ai_provider', prov);
   };
 
   const reportRef = useRef<HTMLDivElement>(null);
@@ -114,17 +126,29 @@ const App: React.FC = () => {
     setIsAiLoading(true);
     setAiInsight(null);
     try {
-      const effectiveKey = apiKey || import.meta.env.VITE_OPENAI_API_KEY;
+      const currentKey = apiKeys[provider] || import.meta.env[`VITE_${provider.toUpperCase()}_API_KEY`];
 
-      if (!effectiveKey || effectiveKey === 'PLACEHOLDER_API_KEY') {
-        alert("Por favor, configure sua chave da OpenAI nas configurações (ícone de engrenagem) para gerar o parecer.");
+      if (!currentKey || currentKey === 'PLACEHOLDER_API_KEY') {
+        alert(`Por favor, configure sua chave da ${provider.toUpperCase()} nas configurações para gerar o parecer.`);
         setIsAiLoading(false);
         return;
       }
 
+      let baseURL = "https://api.openai.com/v1";
+      let model = "gpt-4o";
+
+      if (provider === 'groq') {
+        baseURL = "https://api.groq.com/openai/v1";
+        model = "llama-3.3-70b-versatile";
+      } else if (provider === 'gemini') {
+        baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+        model = "gemini-2.0-flash";
+      }
+
       const openai = new OpenAI({
-        apiKey: effectiveKey,
-        dangerouslyAllowBrowser: true // Necessário para uso no lado do cliente
+        apiKey: currentKey,
+        baseURL,
+        dangerouslyAllowBrowser: true
       });
 
       const systemPrompt = "Você é um assistente médico especializado em análise de risco cardiovascular e renal crônico. Suas respostas devem ser precisas, baseadas em evidências e formatadas como laudos profissionais.";
@@ -148,7 +172,7 @@ const App: React.FC = () => {
       REGRAS: Use linguagem técnica. Não use asteriscos para negrito. Mantenha um tom profissional.`;
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -205,7 +229,7 @@ const App: React.FC = () => {
             </button>
             <button onClick={() => setShowSettings(!showSettings)} className="p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
               <Settings size={20} className="text-slate-500" />
-              {!apiKey && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+              {!apiKeys[provider] && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
             </button>
             <button onClick={() => { setView('calc'); setStep(1); }} className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl">Novo Exame</button>
           </div>
@@ -224,17 +248,18 @@ const App: React.FC = () => {
             </div>
 
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-              Insira sua chave de API da OpenAI para habilitar a geração de laudos inteligentes. A chave será salva apenas no seu navegador.
+              Insira sua chave de API para o provedor <strong>{provider.toUpperCase()}</strong>.
+              {provider === 'groq' && <span className="block mt-2 text-indigo-500 font-bold">Recomendado: Gratuito e Ultrarrápido ⚡</span>}
             </p>
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">API Key (sk-...)</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">API Key ({provider})</label>
                 <input
                   type="password"
-                  value={apiKey}
-                  onChange={(e) => saveApiKey(e.target.value)}
-                  placeholder="sk-..."
+                  value={apiKeys[provider]}
+                  onChange={(e) => saveApiKey(e.target.value, provider)}
+                  placeholder={`Chave ${provider}...`}
                   className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold border-2 border-slate-100 dark:border-slate-700 focus:border-indigo-500 outline-none transition-all text-sm"
                 />
               </div>
@@ -428,7 +453,7 @@ const App: React.FC = () => {
                 <div className="relative z-10 flex flex-col md:flex-row gap-10 items-center">
                   <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center shrink-0"><Brain className="text-indigo-300" size={40} /></div>
                   <div className="flex-grow space-y-4">
-                    <h3 className="text-2xl font-black">Parecer Preditivo OpenAI (GPT-4o)</h3>
+                    <h3 className="text-2xl font-black">Parecer Preditivo IA ({provider.toUpperCase()})</h3>
                     {aiInsight ? (
                       <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-medium">{aiInsight}</div>
                     ) : (
@@ -546,7 +571,7 @@ const App: React.FC = () => {
         </div>
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight italic opacity-60">Diretrizes AHA/ACC e KDIGO Integradas</p>
       </footer>
-    </div>
+    </div >
   );
 };
 
