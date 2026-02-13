@@ -1,0 +1,5 @@
+{
+  "name": "Calculadora de Risco Cardiorrenal Integrada",
+  "description": "Uma ferramenta médica avançada para avaliação integrada do risco cardiovascular (AHA/ACC PCE) e renal (KFRE), projetada para profissionais de saúde com interface responsiva e relatórios detalhados.",
+  "requestFramePermissions": []
+}
